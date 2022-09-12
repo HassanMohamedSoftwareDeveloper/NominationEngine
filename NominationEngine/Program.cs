@@ -1,114 +1,158 @@
 ﻿internal class Program
 {
-    List<NominationCriteria<int>> piplineByPath = new List<NominationCriteria<int>>
+    static List<NominationCriteria<int>> piplineByPath = new List<NominationCriteria<int>>
         {
            new NominationCriteria<int>() { Priorty=1, FieldToCheck=FieldsToCheck.CountryId,TableName=Table.Country,AllowedValues=new List<int>{ 1,2} },
            new NominationCriteria<int>() { Priorty=2, TableName=Table.Specialization },
            new NominationCriteria<int>() { Priorty=3, TableName=Table.StudyField}
         };
 
-    List<Country> countriesRank = new List<Country>
+    static void Main(string[] args)
+    {
+        List<Student> studentsByPath = new List<Student>()
+        {
+                new Student() { NationalId="1", CountryId=1, SpecializationId=2, StudyFieldId=2},
+                new Student() { NationalId="2", CountryId=2, SpecializationId=3, StudyFieldId=1},
+                new Student() { NationalId="3", CountryId=3, SpecializationId=1, StudyFieldId=3},
+                new Student() { NationalId="4", CountryId=1, SpecializationId=3, StudyFieldId=3},
+        };
+        var StudentsRanked = BuildExpression(studentsByPath).ToList();
+        Console.ReadKey();
+    }
+
+    public static IQueryable<Student> BuildExpression(List<Student> studentsByPath)
+    {
+        var query = studentsByPath.AsQueryable();
+
+        foreach (var criteria in piplineByPath.OrderBy(c => c.Priorty))
+        {
+            if (criteria.TableName == Table.Country)
+            {
+                query = Filter.FilterByCountry(query, criteria);
+            }
+            else if (criteria.TableName == Table.Specialization)
+            {
+                query = Filter.FilterBySpecialization(query, criteria);
+            }
+            else if (criteria.TableName == Table.StudyField)
+            {
+                query = Filter.FilterByStudyField(query, criteria);
+            }
+        }
+        bool isOrdered = false;
+        IOrderedQueryable<Student> q = (IOrderedQueryable<Student>)query;
+        foreach (var criteria in piplineByPath.OrderBy(c => c.Priorty))
+        {
+            if (criteria.TableName == Table.Country)
+            {
+                if (isOrdered)
+                    q = q.ThenBy(x => x.CountryRank);
+                else
+                {
+                    q = query.OrderBy(x => x.CountryRank);
+                }
+                isOrdered = true;
+            }
+            else if (criteria.TableName == Table.Specialization)
+            {
+                if (isOrdered)
+                    q = q.ThenBy(x => x.SpecializationRank);
+                else
+                {
+                    q = query.OrderBy(x => x.SpecializationRank);
+                }
+                isOrdered = true;
+            }
+            else if (criteria.TableName == Table.StudyField)
+            {
+                if (isOrdered)
+                    q = q.ThenBy(x => x.StudyFieldRank);
+                else
+                {
+                    q = query.OrderBy(x => x.StudyFieldRank);
+                }
+                isOrdered = true;
+            }
+        }
+        return query;
+    }
+
+
+}
+public class Filter
+{
+    public static IQueryable<Student> FilterByCountry(IQueryable<Student> query, NominationCriteria<int> criteria)
+    {
+        List<Country> countriesRank = new List<Country>
         {
             new Country{Id=1,Rank=1},
             new Country{Id=2,Rank=3},
             new Country{Id=3,Rank=2},
         };
-    List<Specialization> specializationsRank = new List<Specialization>
+
+        if (criteria?.AllowedValues?.Any() ?? false)
+            query = query.Where(x => criteria.AllowedValues.Contains(x.CountryId));
+
+        return query.Join(countriesRank,
+             stKey => stKey.CountryId,
+             countryKey => countryKey.Id,
+             (student, country) => GetStudent(student, country, criteria.TableName));
+
+    }
+    public static IQueryable<Student> FilterBySpecialization(IQueryable<Student> query, NominationCriteria<int> criteria)
+    {
+        List<Specialization> specializationsRank = new List<Specialization>
         {
             new Specialization{Id=1,Rank=1},
             new Specialization{Id=2,Rank=3},
             new Specialization{Id=3,Rank=2},
         };
-    List<StudyField> studyFieldsRank = new List<StudyField>
+
+        if (criteria?.AllowedValues?.Any() ?? false)
+            query = query.Where(x => criteria.AllowedValues.Contains(x.SpecializationId));
+
+        return query.Join(specializationsRank,
+             stKey => stKey.SpecializationId,
+             specializationKey => specializationKey.Id,
+             (student, specialization) => GetStudent(student, specialization, criteria.TableName));
+    }
+
+    public static IQueryable<Student> FilterByStudyField(IQueryable<Student> query, NominationCriteria<int> criteria)
+    {
+        List<StudyField> studyFieldsRank = new List<StudyField>
         {
             new StudyField{Id=2,Rank=3},
             new StudyField{Id=1,Rank=1},
             new StudyField{Id=3,Rank=2},
         };
 
-    List<Student> studentsByPath = new List<Student>()
-        {
-                new Student() { NationalId="1", CountryId=1, SpecializationId=2, StudyFieldId=2},
-                new Student() { NationalId="2", CountryId=2, SpecializationId=3, StudyFieldId=1},
-                new Student() { NationalId="3", CountryId=3, SpecializationId=1, StudyFieldId=3},
-        };
-    static void Main(string[] args)
-    {
-        Console.ReadKey();
+        if (criteria?.AllowedValues?.Any() ?? false)
+            query = query.Where(x => criteria.AllowedValues.Contains(x.SpecializationId));
+
+        return query.Join(studyFieldsRank,
+            stKey => stKey.StudyFieldId,
+            studyFieldKey => studyFieldKey.Id,
+            (student, specialization) => GetStudent(student, specialization, criteria.TableName));
     }
 
-    public IQueryable<Student> BuildExpression()
+
+    private static Student GetStudent(Student student, BaseSetting baseSetting, Table table)
     {
-        IQueryable<Student> query = studentsByPath.AsQueryable();
-
-
-        IQueryable q = null;
-        foreach (var criteria in piplineByPath.OrderBy(c => c.Priorty))
+        if (table == Table.Country)
         {
-            if (criteria.AllowedValues.Any() == false) continue;
-            if (criteria.TableName == Table.Country)
-            {
-                query = query.Where(x => criteria.AllowedValues.Contains(x.CountryId));
-
-                q = query.Join(countriesRank,
-                    stKey => stKey.CountryId,
-                    countryKey => countryKey.Id,
-                    (student, country) => new { Student = student, CountryRank = country.Rank })
-                    .OrderBy(x => x.CountryRank);
-            }
-            else if (criteria.TableName == Table.Specialization)
-            {
-
-            }
+            student.CountryRank = baseSetting.Rank;
         }
-        return query;
+        else if (table == Table.Specialization)
+        {
+            student.SpecializationRank = baseSetting.Rank;
+        }
+        else if (table == Table.StudyField)
+        {
+            student.StudyFieldRank = baseSetting.Rank;
+        }
+        return student;
     }
-
-    //private List<Student> RankByCountry(List<Student> students)
-    //{
-    //    var countries = new List<Country> { new Country() { CountryId = 1, CountryRank = 2 }, new Country() { CountryId = 2, CountryRank = 3 }, new Country() { CountryId = 3, CountryRank = 1 } };
-    //    var availableCountries = new List<int> { 1, 2 };
-    //    return (from s in students
-    //            join c in countries on s.Country.CountryId equals c.CountryId
-    //            select new Student
-    //            {
-    //                NationalId = s.NationalId,
-    //                Country = s.Country
-    //            }).Where(c => availableCountries.Contains(c.Country.CountryId)).OrderBy(c => c.Country.CountryRank).ToList();
-
-    //}
-
-    //private List<Student> RankBySpecialization(List<Student> students)
-    //{
-    //    var specializations = new List<Specialization> { new Specialization() { SpecializationId = 1, SpecializationRank = 3 },
-    //        new Specialization() { SpecializationId = 2, SpecializationRank = 1}, new Specialization() { SpecializationId = 3, SpecializationRank = 2 } };
-    //    var availableSpecializations = new List<int> { 1, 3 };
-    //    return (from s in students
-    //            join c in specializations on s.Specialization.SpecializationId equals c.SpecializationId
-    //            select new Student
-    //            {
-    //                NationalId = s.NationalId,
-    //                Specialization = s.Specialization
-    //            }).Where(c => availableSpecializations.Contains(c.Specialization.SpecializationId)).OrderBy(c => c.Specialization.SpecializationId).ToList();
-
-    //}
-
-    //private List<Student> RankByStudyField(List<Student> students)
-    //{
-    //    var StudyFields = new List<StudyField> { new StudyField() { StudyFieldId = 1, StudyFieldRank = 3 },
-    //        new StudyField() { StudyFieldId = 2, StudyFieldRank = 1}, new StudyField() { StudyFieldId = 3, StudyFieldRank = 2 } };
-    //    var availableStudyFields = new List<int> { 1 };
-    //    return (from s in students
-    //            join c in StudyFields on s.StudyField.StudyFieldId equals c.StudyFieldId
-    //            select new Student
-    //            {
-    //                NationalId = s.NationalId,
-    //                Specialization = s.Specialization
-    //            }).Where(c => availableStudyFields.Contains(c.StudyField.StudyFieldId)).OrderBy(c => c.StudyField.StudyFieldId).ToList();
-
-    //}
 }
-
 public enum FieldsToCheck
 {
     CountryId,
@@ -125,6 +169,7 @@ public class NominationCriteria<T>
     public int Priorty { get; set; }
     public List<T> AllowedValues { get; set; } = new();
     public FieldsToCheck FieldToCheck { get; set; }
+    public int AvailableSeats { get; set; }
 }
 
 public class Student
@@ -133,6 +178,12 @@ public class Student
     public int CountryId { get; set; }
     public int SpecializationId { get; set; }
     public int StudyFieldId { get; set; }
+
+    public int CountryRank { get; set; }
+    public int SpecializationRank { get; set; }
+    public int StudyFieldRank { get; set; }
+
+
 
 }
 public abstract class BaseSetting
@@ -151,5 +202,6 @@ public sealed class Specialization : BaseSetting
 public sealed class StudyField : BaseSetting
 {
 }
+
 
 
