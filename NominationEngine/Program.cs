@@ -129,6 +129,7 @@ public class Student
     public int SpecializationId { get; set; }
     public int StudyFieldId { get; set; }
 
+    public int PathId { get; set; }
     public int CountryRank { get; set; }
     public int SpecializationRank { get; set; }
     public int StudyFieldRank { get; set; }
