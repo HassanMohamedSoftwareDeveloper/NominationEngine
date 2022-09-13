@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using NominationEngine;
+using System.Linq.Expressions;
 
 internal class Program
 {
@@ -25,9 +26,9 @@ internal class Program
         {
            new NominationCriteria()
            {
-               Priorty=2,
+               Priorty=1,
                FieldToOrderBy=(s)=>s.CountryRank,
-               AllowedValues=new List<int>{ 1,2},
+               AllowedValues=new List<int>{ 1,2,3},
                LJoinKey=st=>st.CountryId,
                RJoinKey=b=>b.Id,
                RetunFunc=(st,b)=>{st.CountryRank=b.Rank; return st; },
@@ -37,7 +38,7 @@ internal class Program
            },
            new NominationCriteria()
            {
-               Priorty=1,
+               Priorty=2,
                FieldToOrderBy=(s)=>s.SpecializationRank,
                LJoinKey=st=>st.SpecializationId,
                RJoinKey=b=>b.Id,
@@ -61,14 +62,12 @@ internal class Program
 
     static void Main(string[] args)
     {
-        List<Student> studentsByPath = new List<Student>()
-        {
-                new Student() { NationalId="1", CountryId=1, SpecializationId=2, StudyFieldId=2},
-                new Student() { NationalId="2", CountryId=2, SpecializationId=3, StudyFieldId=1},
-                new Student() { NationalId="3", CountryId=3, SpecializationId=1, StudyFieldId=3},
-                new Student() { NationalId="4", CountryId=1, SpecializationId=3, StudyFieldId=3},
-        };
+        List<Student> studentsByPath = ExcelHelper.GetdataListFromExcelFile(@"D:\tetco\Nomination\students.xlsx");
+
         var StudentsRanked = BuildExpression(studentsByPath).ToList();
+
+        ExcelHelper.CreateExcelDocumentAndSave(StudentsRanked.Select(x => new { NationalId = x.NationalId, CountryRank = x.CountryRank, SpecializationRank = x.SpecializationRank, StudyFieldRank = x.StudyFieldRank }).ToList(), @"D:\tetco\Nomination\nominated.xlsx");
+        Console.WriteLine("done....");
         Console.ReadKey();
     }
 
